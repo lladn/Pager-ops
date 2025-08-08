@@ -2,7 +2,7 @@
 
 ## About
 
-This is the official Wails Svelte-TS template.
+pager ops an application for monitoring incidents
 
 ## Live Development
 
