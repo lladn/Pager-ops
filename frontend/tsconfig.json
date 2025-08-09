@@ -21,7 +21,7 @@
     "src/**/*.ts",
     "src/**/*.js",
     "src/**/*.svelte"
-  ],
+, "../Header.svelte", "../IncidentsPanel.svelte", "../SettingsModal.svelte", "../SetupModal.svelte", "../AlertDetailsPanel.svelte", "ServicesPanel.svelte"  ],
   "references": [
     {
       "path": "./tsconfig.node.json"
