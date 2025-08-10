@@ -456,4 +456,281 @@
       background: var(--accent-blue);
       color: white;
     }
-  </style>
+  </style><script lang="ts">
+  import { incidents, resolvedIncidents, selectedIncident, searchQuery, activeTab, filterType } from '../stores';
+  import IncidentCard from './IncidentCard.svelte';
+  import type { Incident } from '../types';
+  
+  let filterMenuOpen = false;
+  let detailsPanelCollapsed = false;
+  
+  export { detailsPanelCollapsed };
+  
+  function toggleFilterMenu() {
+    filterMenuOpen = !filterMenuOpen;
+  }
+  
+  function applyFilter(type: string) {
+    filterType.set(type);
+    filterMenuOpen = false;
+    
+    switch(type) {
+      case 'groupByService':
+        incidents.update(items => {
+          return [...items].sort((a, b) => a.service.localeCompare(b.service));
+        });
+        break;
+      case 'sortByTime':
+        incidents.update(items => {
+          return [...items].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        });
+        break;
+      case 'sortByAlerts':
+        incidents.update(items => {
+          return [...items].sort((a, b) => b.alertCount - a.alertCount);
+        });
+        break;
+    }
+  }
+  
+  function selectIncident(incident: Incident) {
+    selectedIncident.set(incident);
+    if (detailsPanelCollapsed) {
+      detailsPanelCollapsed = false;
+    }
+  }
+  
+  function toggleDetailsPanel() {
+    detailsPanelCollapsed = !detailsPanelCollapsed;
+  }
+  
+  $: displayedIncidents = $activeTab === 'open' 
+    ? $incidents.filter(i => i.title.toLowerCase().includes($searchQuery.toLowerCase()))
+    : $resolvedIncidents.filter(i => i.title.toLowerCase().includes($searchQuery.toLowerCase()));
+</script>
+
+<div class="incidents-panel">
+  <div class="incidents-header">
+    <div class="incidents-tabs">
+      <div class="tabs-container">
+        <button 
+          class="tab-btn" 
+          class:active={$activeTab === 'open'}
+          on:click={() => activeTab.set('open')}
+        >
+          Open Incidents
+        </button>
+        <button 
+          class="tab-btn" 
+          class:active={$activeTab === 'resolved'}
+          on:click={() => activeTab.set('resolved')}
+        >
+          Resolved
+        </button>
+      </div>
+      <div class="filter-dropdown">
+        <button class="filter-btn" on:click={toggleFilterMenu}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+        </button>
+        {#if filterMenuOpen}
+          <div class="filter-menu">
+            <div class="filter-option" on:click={() => applyFilter('groupByService')}>Group by Service</div>
+            <div class="filter-option" on:click={() => applyFilter('sortByTime')}>Sort by Time</div>
+            <div class="filter-option" on:click={() => applyFilter('sortByAlerts')}>Sort by Alert Count</div>
+          </div>
+        {/if}
+      </div>
+    </div>
+    <div class="incidents-search">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+      <input 
+        type="text" 
+        class="search-input" 
+        placeholder="Search incidents..."
+        bind:value={$searchQuery}
+      >
+    </div>
+  </div>
+  <div class="incidents-list">
+    {#each displayedIncidents as incident}
+      <IncidentCard 
+        {incident} 
+        selected={$selectedIncident?.id === incident.id}
+        on:select={() => selectIncident(incident)}
+      />
+    {/each}
+  </div>
+  {#if detailsPanelCollapsed}
+    <button class="expand-details-btn" on:click={toggleDetailsPanel}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+  {/if}
+</div>
+
+<style>
+  .incidents-panel {
+    flex: 1;
+    min-width: 320px;
+    background: #0f1114;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .incidents-header {
+    padding: 16px;
+    border-bottom: 1px solid #2a2d33;
+    background: #141619;
+  }
+
+  .incidents-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .tabs-container {
+    display: flex;
+    gap: 4px;
+    background: #0f1114;
+    padding: 2px;
+    border-radius: 8px;
+  }
+
+  .tab-btn {
+    padding: 6px 16px;
+    background: transparent;
+    border: none;
+    color: #8b92a9;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .tab-btn.active {
+    background: #1e2025;
+    color: #e0e6ed;
+  }
+
+  .filter-dropdown {
+    position: relative;
+  }
+
+  .filter-btn {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid #2a2d33;
+    color: #8b92a9;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .filter-btn:hover {
+    background: #1e2025;
+    color: #e0e6ed;
+    border-color: #3a3d43;
+  }
+
+  .filter-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: #1e2025;
+    border: 1px solid #2a2d33;
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 180px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    z-index: 50;
+  }
+
+  .filter-option {
+    padding: 8px 12px;
+    color: #e0e6ed;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .filter-option:hover {
+    background: #2a2d33;
+  }
+
+  .incidents-search {
+    position: relative;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    background: #0f1114;
+    border: 1px solid #2a2d33;
+    border-radius: 8px;
+    color: #e0e6ed;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .search-input:focus {
+    border-color: #3b82f6;
+    background: #1a1d21;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8b92a9;
+    pointer-events: none;
+  }
+
+  .incidents-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .expand-details-btn {
+    position: absolute;
+    left: -24px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 48px;
+    background: #141619;
+    border: 1px solid #2a2d33;
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+    color: #8b92a9;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+  }
+
+  .expand-details-btn:hover {
+    background: #1e2025;
+    color: #e0e6ed;
+  }
+</style>
