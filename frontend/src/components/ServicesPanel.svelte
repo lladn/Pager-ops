@@ -1,239 +1,188 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
-    
-    export let services = [];
-    
-    const dispatch = createEventDispatcher();
-    let collapsed = false;
-    let hovering = false;
-    
-    function toggleService(service) {
-      dispatch('toggle', {
-        id: service.id,
-        enabled: !service.enabled
-      });
-    }
-    
-    function toggleAll(enabled) {
-      services.forEach(service => {
-        if (service.enabled !== enabled) {
-          dispatch('toggle', {
-            id: service.id,
-            enabled: enabled
-          });
-        }
-      });
-    }
-    
-    function handleMouseEnter() {
-      if (collapsed) {
-        hovering = true;
-      }
-    }
-    
-    function handleMouseLeave() {
-      hovering = false;
-    }
-    
-    $: panelClass = collapsed && !hovering ? 'panel services-panel collapsed' : 'panel services-panel';
-    $: enabledCount = services.filter(s => s.enabled).length;
-  </script>
+  import { services } from '../stores';
+  import type { Service } from '../types';
   
-  <div 
-    class={panelClass}
-    on:mouseenter={handleMouseEnter}
-    on:mouseleave={handleMouseLeave}
-  >
-    <div class="panel-header">
-      <div class="header-content">
-        <span class="title">Services ({enabledCount}/{services.length})</span>
-        <button 
-          class="collapse-btn"
-          on:click={() => collapsed = !collapsed}
-          title={collapsed ? 'Expand' : 'Collapse'}
-        >
-          {collapsed ? '→' : '←'}
-        </button>
-      </div>
-      {#if !collapsed || hovering}
-        <div class="actions">
-          <button class="btn-sm" on:click={() => toggleAll(true)}>All On</button>
-          <button class="btn-sm" on:click={() => toggleAll(false)}>All Off</button>
+  let collapsed = false;
+  
+  function togglePanel() {
+    collapsed = !collapsed;
+  }
+  
+  function toggleService(service: Service) {
+    service.active = !service.active;
+    services.update(s => s);
+  }
+</script>
+
+<div class="services-panel" class:collapsed>
+  <div class="panel-header">
+    <span class="panel-title">Services</span>
+    <button class="collapse-btn" on:click={togglePanel}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points={collapsed ? "9 18 15 12 9 6" : "15 18 9 12 15 6"}></polyline>
+      </svg>
+    </button>
+  </div>
+  <div class="services-list">
+    {#each $services as service}
+      <div 
+        class="service-item" 
+        class:active={service.active}
+        class:inactive={!service.active}
+        on:click={() => toggleService(service)}
+      >
+        <div class="service-info">
+          <div class="service-icon">{service.abbreviation}</div>
+          <span class="service-name">{service.name}</span>
         </div>
-      {/if}
-    </div>
-    
-    {#if !collapsed || hovering}
-      <div class="panel-content">
-        {#if services.length === 0}
-          <div class="empty-state">
-            <p>No services configured</p>
-            <p class="hint">Add services in Settings</p>
-          </div>
-        {:else}
-          <div class="services-list">
-            {#each services as service}
-              <div 
-                class="service-item"
-                class:enabled={service.enabled}
-                on:click={() => toggleService(service)}
-              >
-                <div class="service-toggle">
-                  <span class="toggle-indicator" class:active={service.enabled}>
-                    {service.enabled ? '✓' : ''}
-                  </span>
-                </div>
-                <div class="service-info">
-                  <div class="service-name">{service.alias || service.id}</div>
-                  {#if service.alias && service.alias !== service.id}
-                    <div class="service-id">{service.id}</div>
-                  {/if}
-                </div>
-              </div>
-            {/each}
-          </div>
+        {#if service.incidentCount > 0}
+          <span class="service-count">{service.incidentCount}</span>
         {/if}
       </div>
-    {/if}
+    {/each}
   </div>
-  
-  <style>
-    .services-panel {
-      width: 250px;
-      transition: width 0.3s ease;
-    }
-    
-    .services-panel.collapsed {
-      width: 60px;
-    }
-    
-    .header-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .title {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    .collapse-btn {
-      padding: 0.25rem;
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 1rem;
-      min-width: 24px;
-    }
-    
-    .collapse-btn:hover {
-      background: var(--bg-primary);
-      transform: none;
-    }
-    
-    .actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    
-    .btn-sm {
-      padding: 0.25rem 0.5rem;
-      font-size: 0.75rem;
-      background: var(--bg-primary);
-      color: var(--text-secondary);
-      flex: 1;
-    }
-    
-    .btn-sm:hover {
-      background: var(--accent-blue);
-      color: white;
-    }
-    
-    .empty-state {
-      text-align: center;
-      padding: 2rem 1rem;
-      color: var(--text-tertiary);
-    }
-    
-    .empty-state p {
-      margin: 0.5rem 0;
-    }
-    
-    .hint {
-      font-size: 0.875rem;
-      opacity: 0.7;
-    }
-    
-    .services-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    
-    .service-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem;
-      background: var(--bg-tertiary);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: 2px solid transparent;
-    }
-    
-    .service-item:hover {
-      background: var(--bg-primary);
-      transform: translateX(4px);
-    }
-    
-    .service-item.enabled {
-      border-color: var(--accent-green);
-      background: rgba(72, 187, 120, 0.1);
-    }
-    
-    .service-toggle {
-      width: 24px;
-      height: 24px;
-      border: 2px solid var(--border-color);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
-    }
-    
-    .service-item.enabled .service-toggle {
-      background: var(--accent-green);
-      border-color: var(--accent-green);
-    }
-    
-    .toggle-indicator {
-      color: white;
-      font-weight: bold;
-      font-size: 0.875rem;
-    }
-    
-    .service-info {
-      flex: 1;
-      min-width: 0;
-    }
-    
-    .service-name {
-      font-weight: 600;
-      color: var(--text-primary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    .service-id {
-      font-size: 0.75rem;
-      color: var(--text-tertiary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-  </style>
+</div>
+
+<style>
+  .services-panel {
+    width: 240px;
+    background: #141619;
+    border-right: 1px solid #2a2d33;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .services-panel.collapsed {
+    width: 60px;
+  }
+
+  .panel-header {
+    padding: 16px;
+    border-bottom: 1px solid #2a2d33;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #8b92a9;
+    letter-spacing: 0.5px;
+  }
+
+  .collapse-btn {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    color: #8b92a9;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .collapse-btn:hover {
+    background: #1e2025;
+    color: #e0e6ed;
+  }
+
+  .services-list {
+    padding: 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .service-item {
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+  }
+
+  .service-item.active {
+    background: #1a1d21;
+    border-left: 3px solid #3b82f6;
+  }
+
+  .service-item.inactive {
+    opacity: 0.5;
+    border-left: 3px solid #ef4444;
+  }
+
+  .service-item:hover {
+    background: #1e2025;
+  }
+
+  .service-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .service-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .service-name {
+    font-size: 13px;
+    color: #e0e6ed;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .service-count {
+    background: #ef4444;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .services-panel.collapsed .panel-header {
+    padding: 16px 8px;
+  }
+
+  .services-panel.collapsed .panel-title {
+    display: none;
+  }
+
+  .services-panel.collapsed .service-name {
+    display: none;
+  }
+
+  .services-panel.collapsed .service-count {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+</style>
