@@ -20,8 +20,8 @@
   <header class="header">
     <div class="header-left">
       <h1 class="app-title">
-        <span class="logo">🚨</span>
-        PagerOps Command Center
+        <span class="logo">🟩</span>
+        PagerOps
       </h1>
       {#if user}
         <div class="user-info">
