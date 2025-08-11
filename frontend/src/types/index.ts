@@ -18,6 +18,7 @@ export interface Incident {
   escalatesIn?: number;
   description?: string;
   notes?: Note[];
+  pinned?: boolean; // Added for pin functionality
 }
 
 export interface Note {
