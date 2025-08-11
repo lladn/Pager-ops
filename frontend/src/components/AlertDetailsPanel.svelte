@@ -1,5 +1,6 @@
 <script lang="ts">
   import { selectedIncident, incidents, resolvedIncidents } from '../stores';
+  import { acknowledgeIncident, escalateIncident, resolveIncident, addIncidentNote } from '../services/api';
   import type { Note } from '../types';
   
   export let collapsed = false;
@@ -9,68 +10,65 @@
   let isResizing = false;
   let startX = 0;
   let startWidth = 0;
+  let isLoading = false;
   
   function togglePanel() {
     collapsed = !collapsed;
   }
   
-  async function acknowledgeIncident() {
-    if (!$selectedIncident) return;
+  async function handleAcknowledge() {
+    if (!$selectedIncident || isLoading) return;
     
+    isLoading = true;
     try {
-      // await AcknowledgeIncident($selectedIncident.id);
-      $selectedIncident.status = 'acknowledged';
-      incidents.update(items => items);
+      await acknowledgeIncident($selectedIncident.id);
     } catch (error) {
       console.error('Failed to acknowledge incident:', error);
+      // You might want to show a user-friendly error message here
+    } finally {
+      isLoading = false;
     }
   }
   
-  async function escalateIncident() {
-    if (!$selectedIncident) return;
+  async function handleEscalate() {
+    if (!$selectedIncident || isLoading) return;
     
+    isLoading = true;
     try {
-      // await EscalateIncident($selectedIncident.id);
-      console.log('Escalating incident:', $selectedIncident.id);
+      // Using default escalation level "1"
+      // You can modify this to get the escalation level from settings or a dropdown
+      await escalateIncident($selectedIncident.id, "1");
     } catch (error) {
       console.error('Failed to escalate incident:', error);
+    } finally {
+      isLoading = false;
     }
   }
   
-  async function resolveIncident() {
-    if (!$selectedIncident) return;
+  async function handleResolve() {
+    if (!$selectedIncident || isLoading) return;
     
+    isLoading = true;
     try {
-      // await ResolveIncident($selectedIncident.id);
-      const resolved = { ...$selectedIncident, status: 'resolved' as const };
-      
-      incidents.update(items => items.filter(i => i.id !== $selectedIncident!.id));
-      resolvedIncidents.update(items => [resolved, ...items]);
-      selectedIncident.set(null);
+      await resolveIncident($selectedIncident.id);
     } catch (error) {
       console.error('Failed to resolve incident:', error);
+    } finally {
+      isLoading = false;
     }
   }
   
   async function addNote() {
-    if (!$selectedIncident || !newNote.trim()) return;
+    if (!$selectedIncident || !newNote.trim() || isLoading) return;
     
+    isLoading = true;
     try {
-      // await AddIncidentNote($selectedIncident.id, newNote);
-      const note: Note = {
-        author: 'Current User',
-        content: newNote,
-        timestamp: new Date()
-      };
-      
-      if (!$selectedIncident.notes) {
-        $selectedIncident.notes = [];
-      }
-      $selectedIncident.notes = [note, ...$selectedIncident.notes];
+      await addIncidentNote($selectedIncident.id, newNote.trim());
       newNote = '';
-      incidents.update(items => items);
     } catch (error) {
       console.error('Failed to add note:', error);
+    } finally {
+      isLoading = false;
     }
   }
   
@@ -145,38 +143,65 @@
           <div class="section-title">Timeline</div>
           <div class="detail-field">
             <div class="field-label">Created</div>
-            <div class="field-value">{$selectedIncident.createdAt.toLocaleString()}</div>
+            <div class="field-value">
+              {$selectedIncident.createdAt instanceof Date 
+                ? $selectedIncident.createdAt.toLocaleString()
+                : new Date($selectedIncident.createdAt).toLocaleString()}
+            </div>
           </div>
         </div>
 
         <div class="detail-section">
           <div class="section-title">Notes</div>
           <div class="notes-container">
-            {#if $selectedIncident.notes}
+            {#if $selectedIncident.notes && $selectedIncident.notes.length > 0}
               {#each $selectedIncident.notes as note}
                 <div class="note-item">
-                  <div class="note-author">{note.author} - {formatTime(note.timestamp)}</div>
+                  <div class="note-author">
+                    {note.author} - {formatTime(note.timestamp instanceof Date ? note.timestamp : new Date(note.timestamp))}
+                  </div>
                   <div class="note-content">{note.content}</div>
                 </div>
               {/each}
+            {:else}
+              <div class="no-notes">No notes yet</div>
             {/if}
           </div>
           <textarea 
             class="add-note-input" 
             placeholder="Add a note..."
             bind:value={newNote}
+            disabled={isLoading}
             on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && addNote()}
           ></textarea>
         </div>
       </div>
       <div class="action-buttons">
         {#if $selectedIncident.status === 'triggered'}
-          <button class="action-btn primary" on:click={acknowledgeIncident}>Acknowledge</button>
+          <button 
+            class="action-btn primary" 
+            on:click={handleAcknowledge}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Loading...' : 'Acknowledge'}
+          </button>
         {/if}
-        <button class="action-btn secondary" on:click={escalateIncident}>Escalate</button>
         {#if $selectedIncident.status !== 'resolved'}
-          <button class="action-btn danger" on:click={resolveIncident}>Resolve</button>
+          <button 
+            class="action-btn secondary" 
+            on:click={handleResolve}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Loading...' : 'Resolve'}
+          </button>
         {/if}
+        <button 
+          class="action-btn tertiary" 
+          on:click={handleEscalate}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Loading...' : 'Escalate'}
+        </button>
       </div>
     {:else}
       <div class="no-selection">
@@ -188,11 +213,10 @@
 
 <style>
   .alert-details-panel {
-    background: #141619;
-    border-left: 1px solid #2a2d33;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-secondary);
+    height: 100%;
     position: relative;
   }
 
@@ -204,46 +228,35 @@
     width: 4px;
     cursor: col-resize;
     background: transparent;
-    transition: background 0.2s;
   }
 
   .resize-handle:hover {
-    background: #3b82f6;
+    background: var(--border-color);
   }
 
   .alert-details-header {
-    padding: 16px;
-    border-bottom: 1px solid #2a2d33;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .panel-title {
-    font-size: 12px;
     font-weight: 600;
-    text-transform: uppercase;
-    color: #8b92a9;
-    letter-spacing: 0.5px;
+    font-size: 16px;
   }
 
   .collapse-btn {
-    width: 24px;
-    height: 24px;
-    background: transparent;
+    background: none;
     border: none;
-    color: #8b92a9;
+    color: var(--text-secondary);
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s;
+    padding: 4px;
   }
 
   .collapse-btn:hover {
-    background: #1e2025;
-    color: #e0e6ed;
+    color: var(--text-primary);
   }
 
   .alert-details-content {
@@ -252,26 +265,14 @@
     padding: 16px;
   }
 
-  .no-selection {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #8b92a9;
-    font-size: 14px;
-  }
-
   .detail-section {
     margin-bottom: 24px;
   }
 
   .section-title {
-    font-size: 12px;
     font-weight: 600;
-    text-transform: uppercase;
-    color: #8b92a9;
     margin-bottom: 12px;
-    letter-spacing: 0.5px;
+    color: var(--text-primary);
   }
 
   .detail-field {
@@ -279,70 +280,69 @@
   }
 
   .field-label {
-    font-size: 11px;
-    color: #8b92a9;
+    font-size: 12px;
+    color: var(--text-secondary);
     margin-bottom: 4px;
   }
 
   .field-value {
-    font-size: 13px;
-    color: #e0e6ed;
-    padding: 8px 12px;
-    background: #0f1114;
-    border-radius: 6px;
-    word-break: break-word;
+    color: var(--text-primary);
   }
 
   .notes-container {
-    background: #0f1114;
-    border-radius: 8px;
-    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
     margin-bottom: 12px;
   }
 
   .note-item {
     padding: 8px;
-    border-left: 2px solid #3b82f6;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
     margin-bottom: 8px;
   }
 
-  .note-item:last-child {
-    margin-bottom: 0;
-  }
-
   .note-author {
-    font-size: 11px;
-    color: #8b92a9;
+    font-size: 12px;
+    color: var(--text-secondary);
     margin-bottom: 4px;
   }
 
   .note-content {
-    font-size: 13px;
-    color: #e0e6ed;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+  }
+
+  .no-notes {
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 8px;
   }
 
   .add-note-input {
     width: 100%;
-    padding: 8px 12px;
-    background: #0f1114;
-    border: 1px solid #2a2d33;
-    border-radius: 6px;
-    color: #e0e6ed;
-    font-size: 13px;
-    font-family: inherit;
-    outline: none;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
     resize: vertical;
     min-height: 60px;
   }
 
   .add-note-input:focus {
-    border-color: #3b82f6;
-    background: #1a1d21;
+    outline: none;
+    border-color: var(--status-acknowledged);
+  }
+
+  .add-note-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .action-buttons {
     padding: 16px;
-    border-top: 1px solid #2a2d33;
+    border-top: 1px solid var(--border-color);
     display: flex;
     gap: 8px;
   }
@@ -351,39 +351,49 @@
     flex: 1;
     padding: 8px 16px;
     border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
+    border-radius: 4px;
     cursor: pointer;
-    transition: all 0.2s;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .action-btn.primary {
-    background: #3b82f6;
+    background: var(--status-acknowledged);
     color: white;
   }
 
-  .action-btn.primary:hover {
-    background: #2563eb;
+  .action-btn.primary:hover:not(:disabled) {
+    opacity: 0.9;
   }
 
   .action-btn.secondary {
-    background: #1e2025;
-    color: #e0e6ed;
-    border: 1px solid #2a2d33;
+    background: var(--status-resolved);
+    color: white;
   }
 
-  .action-btn.secondary:hover {
-    background: #2a2d33;
+  .action-btn.secondary:hover:not(:disabled) {
+    opacity: 0.9;
   }
 
-  .action-btn.danger {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.3);
+  .action-btn.tertiary {
+    background: var(--status-escalated);
+    color: white;
   }
 
-  .action-btn.danger:hover {
-    background: rgba(239, 68, 68, 0.3);
+  .action-btn.tertiary:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  .no-selection {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
   }
 </style>

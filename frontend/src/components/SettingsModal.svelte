@@ -21,14 +21,30 @@
       cancel();
     }
   }
+  
+  function handleBackdropKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      cancel();
+    }
+  }
 </script>
 
 {#if show}
-  <div class="modal-backdrop" on:click={handleBackdropClick} transition:fade={{ duration: 200 }}>
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div 
+    class="modal-backdrop" 
+    on:click={handleBackdropClick} 
+    on:keydown={handleBackdropKeydown}
+    transition:fade={{ duration: 200 }}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-title"
+  >
     <div class="modal" transition:scale={{ duration: 200, start: 0.95 }}>
       <div class="modal-header">
-        <h2>Settings</h2>
-        <button class="close-btn" on:click={cancel}>
+        <h2 id="settings-title">Settings</h2>
+        <button class="close-btn" on:click={cancel} aria-label="Close settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -53,24 +69,8 @@
           </div>
           
           <div class="setting-item">
-            <label for="compact-view">
+            <label>
               <input 
-                id="compact-view"
-                type="checkbox" 
-                bind:checked={localSettings.compactView}
-              />
-              Compact View
-            </label>
-          </div>
-        </div>
-        
-        <div class="settings-section">
-          <h3>Notifications</h3>
-          
-          <div class="setting-item">
-            <label for="sound-enabled">
-              <input 
-                id="sound-enabled"
                 type="checkbox" 
                 bind:checked={localSettings.soundEnabled}
               />
@@ -79,13 +79,12 @@
           </div>
           
           <div class="setting-item">
-            <label for="desktop-notif">
+            <label>
               <input 
-                id="desktop-notif"
                 type="checkbox" 
                 bind:checked={localSettings.desktopNotifications}
               />
-              Desktop Notifications
+              Enable Desktop Notifications
             </label>
           </div>
         </div>
@@ -94,11 +93,25 @@
           <h3>Appearance</h3>
           
           <div class="setting-item">
-            <label for="theme">Theme</label>
-            <select id="theme" bind:value={localSettings.theme} class="setting-select">
+            <label for="theme-select">Theme</label>
+            <select 
+              id="theme-select"
+              bind:value={localSettings.theme}
+              class="setting-select"
+            >
               <option value="dark">Dark</option>
               <option value="light">Light</option>
             </select>
+          </div>
+          
+          <div class="setting-item">
+            <label>
+              <input 
+                type="checkbox" 
+                bind:checked={localSettings.compactView}
+              />
+              Compact View
+            </label>
           </div>
         </div>
       </div>

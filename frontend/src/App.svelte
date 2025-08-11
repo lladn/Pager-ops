@@ -10,7 +10,7 @@
   import type { Incident, Service } from './types';
   
   let detailsPanelCollapsed = false;
-  let pollInterval: number;
+  let pollInterval: ReturnType<typeof setInterval> | undefined;
   
   onMount(async () => {
     // Set up event listeners for backend updates
@@ -26,7 +26,9 @@
       if (pollInterval) {
         clearInterval(pollInterval);
       }
-      pollInterval = setInterval(pollData, $settings.refreshInterval);
+      if ($settings.refreshInterval > 0) {
+        pollInterval = setInterval(pollData, $settings.refreshInterval);
+      }
     });
     
     // Handle click outside for dropdowns
@@ -53,6 +55,7 @@
       await loadIncidents();
     } catch (error) {
       console.error('Failed to initialize:', error);
+      // You might want to show a user-friendly error message here
     }
   }
   
@@ -66,6 +69,9 @@
       }
       return [...items];
     });
+    
+    // Update service counts
+    updateServiceCounts();
   }
   
   function handleServiceUpdate(service: Service) {
@@ -83,61 +89,138 @@
   }
   
   function handleClickOutside(event: MouseEvent) {
-    // This is handled by individual components
+    // Close dropdowns when clicking outside
+    const target = event.target as HTMLElement;
+    if (!target.closest('.dropdown-container')) {
+      // Dispatch custom event to close all dropdowns
+      window.dispatchEvent(new CustomEvent('close-dropdowns'));
+    }
+  }
+  
+  function updateServiceCounts() {
+    services.update(items => {
+      const currentIncidents = $incidents;
+      
+      items.forEach(service => {
+        service.incidentCount = currentIncidents.filter(
+          i => i.service === service.name && i.status !== 'resolved'
+        ).length;
+      });
+      
+      return [...items];
+    });
+  }
+  
+  function toggleDetailsPanel() {
+    detailsPanelCollapsed = !detailsPanelCollapsed;
+  }
+  
+  // Subscribe to selectedIncident to ensure details panel shows when needed
+  $: if ($selectedIncident) {
+    detailsPanelCollapsed = false;
   }
 </script>
 
-<div class="app">
+<main class="app">
   <TopBar />
-  <div class="main-container">
+  
+  <div class="main-content">
     <ServicesPanel />
-    <IncidentsPanel bind:detailsPanelCollapsed />
-    <AlertDetailsPanel collapsed={detailsPanelCollapsed} />
+    
+    <div class="incidents-container">
+      <IncidentsPanel />
+    </div>
+    
+    {#if $selectedIncident}
+      <div class="details-panel" class:collapsed={detailsPanelCollapsed}>
+        <button class="collapse-toggle" on:click={toggleDetailsPanel}>
+          {detailsPanelCollapsed ? '◀' : '▶'}
+        </button>
+        <AlertDetailsPanel />
+      </div>
+    {/if}
   </div>
-</div>
+</main>
 
 <style>
-  :global(*) {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  
-  :global(body) {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: #0a0b0d;
-    color: #e0e6ed;
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     overflow: hidden;
   }
   
-  .app {
-    height: 100vh;
+  .main-content {
     display: flex;
-    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
   }
   
-  .main-container {
+  .incidents-container {
+    flex: 1;
     display: flex;
-    height: calc(100vh - 48px);
+    flex-direction: column;
+    min-width: 0;
+  }
+  
+  .details-panel {
+    width: 400px;
+    border-left: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    transition: width 0.3s ease;
     position: relative;
   }
   
-  /* Global Scrollbar Styling */
-  :global(::-webkit-scrollbar) {
-    width: 8px;
-    height: 8px;
+  .details-panel.collapsed {
+    width: 40px;
   }
   
-  :global(::-webkit-scrollbar-track) {
-    background: #0f1114;
+  .collapse-toggle {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+    padding: 8px 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    z-index: 10;
   }
   
-  :global(::-webkit-scrollbar-thumb) {
-    background: #2a2d33;
-    border-radius: 4px;
+  .collapse-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
   
-  :global(::-webkit-scrollbar-thumb:hover) {
-    background: #3a3d43;
+  :global(:root) {
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #252525;
+    --bg-hover: #2a2a2a;
+    --text-primary: #ffffff;
+    --text-secondary: #999999;
+    --text-muted: #666666;
+    --border-color: #2a2a2a;
+    --status-triggered: #ff4444;
+    --status-acknowledged: #ffaa00;
+    --status-resolved: #00aa00;
+    --status-escalated: #ff6600;
+    --urgency-high: #ff4444;
+    --urgency-low: #999999;
+  }
+  
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  }
+  
+  :global(*) {
+    box-sizing: border-box;
   }
 </style>

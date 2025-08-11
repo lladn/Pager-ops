@@ -12,12 +12,19 @@
     service.active = !service.active;
     services.update(s => s);
   }
+  
+  function handleServiceKeydown(event: KeyboardEvent, service: Service) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleService(service);
+    }
+  }
 </script>
 
 <div class="services-panel" class:collapsed>
   <div class="panel-header">
     <span class="panel-title">Services</span>
-    <button class="collapse-btn" on:click={togglePanel}>
+    <button class="collapse-btn" on:click={togglePanel} aria-label="Toggle services panel">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points={collapsed ? "9 18 15 12 9 6" : "15 18 9 12 15 6"}></polyline>
       </svg>
@@ -30,13 +37,18 @@
         class:active={service.active}
         class:inactive={!service.active}
         on:click={() => toggleService(service)}
+        on:keydown={(e) => handleServiceKeydown(e, service)}
+        role="button"
+        tabindex="0"
+        aria-pressed={service.active}
+        aria-label="{service.name} - {service.active ? 'Active' : 'Inactive'}"
       >
         <div class="service-info">
           <div class="service-icon">{service.abbreviation}</div>
           <span class="service-name">{service.name}</span>
         </div>
         {#if service.incidentCount > 0}
-          <span class="service-count">{service.incidentCount}</span>
+          <span class="service-count" aria-label="{service.incidentCount} incidents">{service.incidentCount}</span>
         {/if}
       </div>
     {/each}
@@ -112,6 +124,11 @@
     position: relative;
   }
 
+  .service-item:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
   .service-item.active {
     background: #1a1d21;
     border-left: 3px solid #3b82f6;
@@ -129,30 +146,37 @@
   .service-info {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 0;
+    gap: 12px;
   }
 
   .service-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    width: 32px;
+    height: 32px;
+    background: #2a2d33;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
-    font-weight: bold;
-    color: white;
-    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e0e6ed;
+  }
+
+  .services-panel.collapsed .service-icon {
+    margin: 0 auto;
   }
 
   .service-name {
-    font-size: 13px;
+    font-size: 14px;
     color: #e0e6ed;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .services-panel.collapsed .service-name {
+    display: none;
   }
 
   .service-count {
@@ -166,23 +190,11 @@
     text-align: center;
   }
 
-  .services-panel.collapsed .panel-header {
-    padding: 16px 8px;
-  }
-
-  .services-panel.collapsed .panel-title {
-    display: none;
-  }
-
-  .services-panel.collapsed .service-name {
-    display: none;
-  }
-
   .services-panel.collapsed .service-count {
     position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 9px;
-    padding: 1px 4px;
+    top: 8px;
+    right: 8px;
+    padding: 2px 4px;
+    font-size: 10px;
   }
 </style>
